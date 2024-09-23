@@ -1,0 +1,175 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include <QFileDialog>
+#include <QStringList>
+#include <QImage>
+#include <QPixmap>
+#include <QGraphicsPixmapItem>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+    , scene(new QGraphicsScene(this))
+    , displayIndex(-1)
+{
+    ui->setupUi(this);
+    setupView();
+}
+
+MainWindow::~MainWindow()
+{
+    /*clear struct*/
+    for (ABWImage* img : myImages) {
+        delete img;
+    }
+    delete ui;
+}
+
+
+void MainWindow::setupView()
+{
+    view = new QGraphicsView(scene, this);
+    ui->verticalLayout->addWidget(view);
+}
+
+//-----Image Viewer-----//
+void MainWindow::displayImages()
+{
+    /* when displayIndex >=0 and <struct size
+     * get the particular struct using the displayIndex
+     * render the image */
+    if(displayIndex >=0 && displayIndex<myImages.size()){
+        ABWImage* tempABWs = myImages[displayIndex];
+        QPixmap pixmap = QPixmap::fromImage(tempABWs->image);
+        scene->clear();
+        QGraphicsPixmapItem *item = scene->addPixmap(pixmap);
+    }
+}
+
+
+void MainWindow::on_loadBtn_clicked()
+{
+    /* Get images1
+     * fileDialog - dialog for file selection
+     * fileDialog - filemode - to select from existing files
+     * fileDialog - Namefilter - render image files  */
+    QFileDialog dialog;
+    dialog.setFileMode(QFileDialog::ExistingFiles);
+    dialog.setNameFilter("*.png *.jpg *.jpeg");
+
+    /* Get image2
+     * Declare QStringList - to store list of file pathway
+     *execute dialog - when file is selected, return true
+     *dialog.selectedFiles return list of file pathway*/
+    QStringList filesName;
+    if(dialog.exec()){
+        filesName = dialog.selectedFiles();
+    }
+
+    /* Store images into struct
+     * when filesNames is not empty
+     * for loop - get one file name once,
+     * access to image using filename
+     * load image, pathway into struc, initialised bool = false */
+    if(!filesName.isEmpty()){
+        for(QString& tempFile: filesName){
+            ABWImage* tempABWs = new ABWImage();
+            tempABWs->image = QImage(tempFile);
+            tempABWs->filename = tempFile;
+            tempABWs->statusOnDialog = false;
+            myImages.append(tempABWs);
+        }
+    }
+
+    /*Update dispaly index*/
+    if(!myImages.isEmpty() && displayIndex == -1){
+        displayIndex = 0;
+    }
+
+    updateTable();
+
+}
+
+
+void MainWindow::on_displayBtn_clicked()
+{
+    displayImages();
+}
+
+
+void MainWindow::on_prevBtn_clicked()
+{
+    /*when myImage is not empty
+     *display previous Image by changing the displayIndex
+     *range of displayIndex must between the myImage's size
+     *call display function*/
+    if(!myImages.isEmpty()){
+        displayIndex = (displayIndex -1 + myImages.size())% myImages.size();
+    }
+    displayImages();
+
+}
+
+
+void MainWindow::on_nextBtn_clicked()
+{
+    /*when myImage is not empty
+     *display next Image by changing the displayIndex
+     *range of displayIndex must between the myImage's size
+     *call display function*/
+    if(!myImages.isEmpty()){
+        displayIndex = (displayIndex+1)% myImages.size();
+    }
+    displayImages();
+}
+
+
+void MainWindow::on_unloadBtn_clicked()
+{
+    /*clear struct, reset displayIndex
+     *clear scene*/
+    for (ABWImage* img : myImages) {
+        delete img;
+    }
+    myImages.clear();
+    displayIndex = -1;
+    scene->clear();
+}
+
+
+
+//------MANAGE TABLE------//
+void MainWindow::on_selectImgsBtn_clicked()
+{
+    /*Table formed, check item row by row
+     *loop all the item, the condition of statusOnDialog = condition of checkbox*/
+    for (int row = 0; row < ui->imageTable->rowCount(); ++row) {
+        QTableWidgetItem* item = ui->imageTable->item(row, 1);
+        myImages[row]->statusOnDialog = (item->checkState() == Qt::Checked);
+    }
+}
+
+
+void MainWindow::updateTable()
+{
+    /*When image load,
+     *relate with on_loadBtn_clicked()*/
+
+    //reset table
+    ui->imageTable->setRowCount(0);
+    ui->imageTable->setColumnCount(2);
+
+
+
+    for (const ABWImage* img : myImages) {
+        int row = ui->imageTable->rowCount();
+        ui->imageTable->insertRow(row);
+        ui->imageTable->setItem(row, 0, new QTableWidgetItem(img->filename));
+
+        QTableWidgetItem* checkItem = new QTableWidgetItem();
+        checkItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
+        checkItem->setCheckState(img->statusOnDialog ? Qt::Checked : Qt::Unchecked);
+        ui->imageTable->setItem(row, 1, checkItem);
+    }
+
+}
